@@ -391,10 +391,10 @@ export default function App(){
           <div className="max-w-[1280px] mx-auto px-4 lg:px-6 h-[72px] flex items-center justify-between gap-4">
             <div className="h-12 px-3 rounded-xl bg-white grid place-items-center overflow-hidden shrink-0 shadow-lg ring-1 ring-white/20">
               <img
-                src="/dhre-logo.svg"
+                src="./dhre-logo.svg"
                 alt="DUBAI HOLDING REAL ESTATE"
                 className="h-10 w-auto object-contain"
-                onError={(e)=>{ e.currentTarget.src='/dhre-logo.jpg'; e.currentTarget.onerror=null }}
+                onError={(e)=>{ e.currentTarget.src='./dhre-logo.jpg'; e.currentTarget.onerror=null }}
               />
             </div>
             <div className="flex-1 flex flex-col items-center justify-center text-center">
