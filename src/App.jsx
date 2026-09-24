@@ -572,7 +572,7 @@ export default function App(){
                       <button onClick={(e)=>{ e.stopPropagation(); openEdit(site)}} className="flex-1 py-2 rounded-full border bg-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-slate-50" style={{ borderColor: '#e2e8f0' }}><Pencil size={14} /> Edit</button>
                       <button onClick={(e)=>{ e.stopPropagation(); handleDelete(site.id)}} className="px-3 py-2 rounded-full border bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200" style={{ borderColor: '#e2e8f0' }}><Trash2 size={16} /></button>
                       <button onClick={(e)=>{ e.stopPropagation(); openIncidentAdd(site.id); setPage('incidents'); toast.info(`Reporting incident for ${site.name}`)}} className="px-3 py-2 rounded-full bg-red-600 text-white hover:bg-red-700" title="Report incident"><FileText size={16} /></button>
-                      <a href={`http://localhost:5175?site=${site.id}`} target="_blank" onClick={(e)=>e.stopPropagation()} className="px-3 py-2 rounded-full bg-sky-600 text-white hover:bg-sky-700 grid place-items-center" title="Open Owner Portal"><User size={16} /></a>
+                      <a href={`https://bayhas39.github.io/dhre-security-owner/?site=${site.id}&pin=${site.pincode}`} target="_blank" onClick={(e)=>e.stopPropagation()} className="px-3 py-2 rounded-full bg-sky-600 text-white hover:bg-sky-700 grid place-items-center" title="Open Owner Website"><User size={16} /></a>
                     </div>
                     <div className="mt-2 text-[11px] text-center text-slate-400">Click card to see issues & charts →</div>
                       </div>
@@ -620,7 +620,7 @@ export default function App(){
                   <div className="mt-2 text-[11px] text-slate-500">Generate → copy → owner enters it in Owner Portal to login.</div>
                 </div>
                 <div className="lg:col-span-7">
-                  {pinSiteId ? (()=>{ const s=sites.find(x=>x.id===pinSiteId); if(!s) return null; const linkHttp=`http://localhost:5175?site=${s.id}&pin=${s.pincode}`; const linkFile=`file:///C:/Users/Bayhas/Desktop/owner-portal/index.html?site=${s.id}&pin=${s.pincode}`; return (
+                  {pinSiteId ? (()=>{ const s=sites.find(x=>x.id===pinSiteId); if(!s) return null; const linkHttp=`https://bayhas39.github.io/dhre-security-owner/?site=${s.id}&pin=${s.pincode}`; const linkFile=`file:///C:/Users/Bayhas/Desktop/owner-portal/index.html?site=${s.id}&pin=${s.pincode}`; return (
                     <div className="rounded-xl border bg-slate-50 p-4" style={{ borderColor:'#eef2f7' }}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -1327,7 +1327,7 @@ export default function App(){
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={()=>{ setDetailSiteId(null); openEdit(detailSite)}} className="px-3 py-1.5 rounded-full bg-white border text-xs font-bold hover:bg-slate-50" style={{ borderColor:'#e2e8f0' }}><Pencil size={12} /> Edit</button>
-                  <a href={`http://localhost:5175?site=${detailSite.id}&pin=${detailSite.pincode}`} target="_blank" className="px-3 py-1.5 rounded-full bg-sky-600 text-white text-xs font-bold hover:bg-sky-700">Owner →</a>
+                  <a href={`https://bayhas39.github.io/dhre-security-owner/?site=${detailSite.id}&pin=${detailSite.pincode}`} target="_blank" className="px-3 py-1.5 rounded-full bg-sky-600 text-white text-xs font-bold hover:bg-sky-700">Owner Website →</a>
                   <button onClick={()=>setDetailSiteId(null)} className="w-8 h-8 grid place-items-center rounded-full hover:bg-slate-100"><X size={18} /></button>
                 </div>
               </div>
