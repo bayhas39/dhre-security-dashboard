@@ -192,6 +192,7 @@ export default function App(){
   const [form, setForm] = useState({ name:'', location:'', type:'Construction', status:'Pending', date: new Date().toISOString().slice(0,10), inspector:'', notes:'', totalCameras: 0, offlineCameras: 0, totalANPR: 0, offlineANPR: 0, notWorkingANPR: 0, notWorkingGate: 0, notWorkingIntercom: 0 })
   const [amcFilter, setAmcFilter] = useState('all') // all | offlineCam | offlineANPR
   const [pinSiteId, setPinSiteId] = useState('')
+  const [detailSiteId, setDetailSiteId] = useState(null)
 
   useEffect(()=>{ localStorage.setItem('site-inspection-sites-v80', JSON.stringify(sites)); localStorage.setItem('site-inspection-sites', JSON.stringify(sites)) }, [sites])
   useEffect(()=>{ localStorage.setItem('site-inspection-incidents', JSON.stringify(incidents)) }, [incidents])
@@ -336,6 +337,11 @@ export default function App(){
       notWorkingPct: totalANPR ? Math.round((notWorkingANPR/totalANPR)*100) : 0,
     }
   }, [sites])
+
+  const detailSite = useMemo(()=> sites.find(s=>s.id===detailSiteId) || null, [sites, detailSiteId])
+  const detailIncidents = useMemo(()=> incidents.filter(i=> i.siteId===detailSiteId), [incidents, detailSiteId])
+  const detailAccidents = useMemo(()=> accidents.filter(a=> a.siteId===detailSiteId), [accidents, detailSiteId])
+  const detailProblems = useMemo(()=> detailSite ? problemsForSite(detailSite, sites.indexOf(detailSite), incidents) : [], [detailSite, sites, incidents])
 
   const openAdd = () => {
     setEditing(null)
@@ -541,7 +547,7 @@ export default function App(){
                 {filtered.map(site=>{
                   const t = TYPES.find(x=>x.value===site.type)
                   return (
-                <motion.div key={site.id} layout initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} className="group bg-white rounded-[20px] border overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition" style={{ borderColor: '#e2e8f0' }}>
+                <motion.div key={site.id} layout initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} onClick={()=>setDetailSiteId(site.id)} className="group bg-white rounded-[20px] border overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition cursor-pointer" style={{ borderColor: '#e2e8f0' }}>
                   <div className="p-4">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full text-white ${t?.color || 'bg-slate-700'}`}><t.icon size={12} />{site.type}</span>
@@ -563,11 +569,12 @@ export default function App(){
                         </div>
                         {site.notes && <p className="mt-3 text-sm leading-relaxed text-slate-600 line-clamp-2 bg-slate-50 rounded-xl p-3 border" style={{ borderColor: '#eef2ff' }}>{site.notes}</p>}
                     <div className="mt-4 flex gap-2">
-                      <button onClick={()=>openEdit(site)} className="flex-1 py-2 rounded-full border bg-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-slate-50" style={{ borderColor: '#e2e8f0' }}><Pencil size={14} /> Edit</button>
-                      <button onClick={()=>handleDelete(site.id)} className="px-3 py-2 rounded-full border bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200" style={{ borderColor: '#e2e8f0' }}><Trash2 size={16} /></button>
-                      <button onClick={()=>{ openIncidentAdd(site.id); setPage('incidents'); toast.info(`Reporting incident for ${site.name}`)}} className="px-3 py-2 rounded-full bg-red-600 text-white hover:bg-red-700" title="Report incident"><FileText size={16} /></button>
-                      <a href={`http://localhost:5175?site=${site.id}`} target="_blank" className="px-3 py-2 rounded-full bg-sky-600 text-white hover:bg-sky-700 grid place-items-center" title="Open Owner Portal"><User size={16} /></a>
+                      <button onClick={(e)=>{ e.stopPropagation(); openEdit(site)}} className="flex-1 py-2 rounded-full border bg-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-slate-50" style={{ borderColor: '#e2e8f0' }}><Pencil size={14} /> Edit</button>
+                      <button onClick={(e)=>{ e.stopPropagation(); handleDelete(site.id)}} className="px-3 py-2 rounded-full border bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200" style={{ borderColor: '#e2e8f0' }}><Trash2 size={16} /></button>
+                      <button onClick={(e)=>{ e.stopPropagation(); openIncidentAdd(site.id); setPage('incidents'); toast.info(`Reporting incident for ${site.name}`)}} className="px-3 py-2 rounded-full bg-red-600 text-white hover:bg-red-700" title="Report incident"><FileText size={16} /></button>
+                      <a href={`http://localhost:5175?site=${site.id}`} target="_blank" onClick={(e)=>e.stopPropagation()} className="px-3 py-2 rounded-full bg-sky-600 text-white hover:bg-sky-700 grid place-items-center" title="Open Owner Portal"><User size={16} /></a>
                     </div>
+                    <div className="mt-2 text-[11px] text-center text-slate-400">Click card to see issues & charts →</div>
                       </div>
                     </motion.div>
                   )
@@ -582,13 +589,13 @@ export default function App(){
                     </thead>
                     <tbody className="divide-y" style={{ borderColor: '#f1f5f9' }}>
                       {filtered.map(s=>(
-                        <tr key={s.id} className="hover:bg-slate-50">
+                        <tr key={s.id} onClick={()=>setDetailSiteId(s.id)} className="hover:bg-slate-50 cursor-pointer">
                           <td className="px-4 py-3"><div className="font-semibold line-clamp-1">{s.name}</div><div className="text-xs text-slate-500 flex items-center gap-1"><MapPin size={10} />{s.location}</div></td>
                           <td className="px-4 py-3 hidden lg:table-cell"><span className="text-xs font-semibold px-2 py-1 rounded-full bg-slate-100 border" style={{ borderColor: '#e2e8f0' }}>{s.type}</span></td>
                           <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
                           <td className="px-4 py-3 hidden md:table-cell text-slate-600">{s.date}</td>
                           <td className="px-4 py-3 hidden md:table-cell text-slate-600">{s.inspector || '-'}</td>
-                          <td className="px-4 py-3 text-right"><div className="inline-flex gap-1"><button onClick={()=>openEdit(s)} className="w-8 h-8 grid place-items-center rounded-full border hover:bg-white" style={{ borderColor: '#e2e8f0' }}><Pencil size={14} /></button><button onClick={()=>handleDelete(s.id)} className="w-8 h-8 grid place-items-center rounded-full border hover:bg-red-50 hover:text-red-600" style={{ borderColor: '#e2e8f0' }}><Trash2 size={14} /></button></div></td>
+                          <td className="px-4 py-3 text-right"><div className="inline-flex gap-1"><button onClick={(e)=>{ e.stopPropagation(); openEdit(s)}} className="w-8 h-8 grid place-items-center rounded-full border hover:bg-white" style={{ borderColor: '#e2e8f0' }}><Pencil size={14} /></button><button onClick={(e)=>{ e.stopPropagation(); handleDelete(s.id)}} className="w-8 h-8 grid place-items-center rounded-full border hover:bg-red-50 hover:text-red-600" style={{ borderColor: '#e2e8f0' }}><Trash2 size={14} /></button></div></td>
                         </tr>
                       ))}
                     </tbody>
@@ -1300,6 +1307,103 @@ export default function App(){
                 <button type="submit" className="px-6 py-2.5 rounded-full bg-red-600 text-white font-bold inline-flex items-center gap-2 hover:bg-red-700"><Save size={16} />{editingIncident ? 'Save Changes' : 'Report Incident'}</button>
               </div>
             </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Site Detail — click a site → issues & charts for that site */}
+      <AnimatePresence>
+        {detailSite && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} className="fixed inset-0 z-40 grid place-items-center p-4">
+            <div onClick={()=>setDetailSiteId(null)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+            <motion.div initial={{ scale:0.96, y:8 }} animate={{ scale:1, y:0 }} exit={{ scale:0.96, y:8 }} className="relative w-full max-w-[880px] bg-[#f8fafc] rounded-[24px] shadow-2xl border overflow-hidden max-h-[90vh] flex flex-col" style={{ borderColor:'#e2e8f0' }}>
+              <div className="px-6 py-4 bg-white border-b flex items-center justify-between" style={{ borderColor:'#e2e8f0' }}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-10 h-10 rounded-xl grid place-items-center text-white shrink-0 ${TYPES.find(t=>t.value===detailSite.type)?.color || 'bg-slate-700'}`}>{(() => { const T = TYPES.find(t=>t.value===detailSite.type); return T ? <T.icon size={18} /> : <Building2 size={18} /> })()}</div>
+                  <div className="min-w-0">
+                    <div className="font-extrabold leading-none truncate">{detailSite.name}</div>
+                    <div className="text-xs text-slate-500 flex items-center gap-1.5 truncate"><MapPin size={11} />{detailSite.location} • {detailSite.type} • <StatusBadge status={detailSite.status} /></div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button onClick={()=>{ setDetailSiteId(null); openEdit(detailSite)}} className="px-3 py-1.5 rounded-full bg-white border text-xs font-bold hover:bg-slate-50" style={{ borderColor:'#e2e8f0' }}><Pencil size={12} /> Edit</button>
+                  <a href={`http://localhost:5175?site=${detailSite.id}&pin=${detailSite.pincode}`} target="_blank" className="px-3 py-1.5 rounded-full bg-sky-600 text-white text-xs font-bold hover:bg-sky-700">Owner →</a>
+                  <button onClick={()=>setDetailSiteId(null)} className="w-8 h-8 grid place-items-center rounded-full hover:bg-slate-100"><X size={18} /></button>
+                </div>
+              </div>
+              <div className="p-4 overflow-auto space-y-4">
+                {/* Stats for this site */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="bg-white rounded-xl border p-3" style={{ borderColor:'#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-slate-500">Total Cameras</div><div className="text-2xl font-extrabold">{detailSite.totalCameras||0}</div><div className="text-xs text-slate-500">{(detailSite.totalCameras||0)-(detailSite.offlineCameras||0)} online • {detailSite.offlineCameras||0} offline</div></div>
+                  <div className="bg-white rounded-xl border p-3" style={{ borderColor: (detailSite.offlineCameras||0)>0 ? '#fecaca' : '#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-red-600">Offline CCTV</div><div className="text-2xl font-extrabold text-red-600">{detailSite.offlineCameras||0}</div><div className="text-xs text-slate-500">{detailSite.totalCameras ? Math.round(((detailSite.offlineCameras||0)/detailSite.totalCameras)*100) : 0}% offline</div></div>
+                  <div className="bg-white rounded-xl border p-3" style={{ borderColor:'#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-slate-500">ANPR</div><div className="text-2xl font-extrabold">{detailSite.totalANPR||0}</div><div className="text-xs text-slate-500">Offline {detailSite.offlineANPR||0} • Not working {detailSite.notWorkingANPR||0}</div></div>
+                  <div className="bg-white rounded-xl border p-3" style={{ borderColor: detailProblems.length>0 ? '#fde68a' : '#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-amber-700">Problems</div><div className="text-2xl font-extrabold">{detailProblems.length}</div><div className="text-xs text-slate-500 truncate">{detailProblems.join(' • ') || 'No problems'}</div></div>
+                </div>
+                {/* Charts for this site */}
+                <div className="grid lg:grid-cols-2 gap-3">
+                  <div className="bg-white rounded-xl border p-3" style={{ borderColor:'#e2e8f0' }}>
+                    <div className="text-xs font-bold tracking-widest uppercase text-slate-500">Cameras — This Site</div>
+                    <div className="h-[180px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={[{ name:'Online', value: Math.max(0,(detailSite.totalCameras||0)-(detailSite.offlineCameras||0)), color:'#10b981' }, { name:'Offline', value: detailSite.offlineCameras||0, color:'#ef4444' }].filter(d=>d.value>0)} cx="50%" cy="50%" innerRadius={42} outerRadius={64} dataKey="value">
+                            {[{ color:'#10b981' }, { color:'#ef4444' }].map((c,i)=><Cell key={i} fill={c.color} />)}
+                          </Pie>
+                          <Tooltip content={<CustomTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex justify-center gap-3 text-xs"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Online {(detailSite.totalCameras||0)-(detailSite.offlineCameras||0)}</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" />Offline {detailSite.offlineCameras||0}</span></div>
+                  </div>
+                  <div className="bg-white rounded-xl border p-3" style={{ borderColor:'#e2e8f0' }}>
+                    <div className="text-xs font-bold tracking-widest uppercase text-slate-500">ANPR — This Site</div>
+                    <div className="h-[180px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={[{ name:'Online', value: Math.max(0,(detailSite.totalANPR||0)-(detailSite.offlineANPR||0)-(detailSite.notWorkingANPR||0)), color:'#10b981' }, { name:'Offline', value: detailSite.offlineANPR||0, color:'#f59e0b' }, { name:'Not Working', value: detailSite.notWorkingANPR||0, color:'#7c3aed' }].filter(d=>d.value>0)} cx="50%" cy="50%" innerRadius={42} outerRadius={64} dataKey="value">
+                            {[ '#10b981','#f59e0b','#7c3aed'].map((c,i)=><Cell key={i} fill={c} />)}
+                          </Pie>
+                          <Tooltip content={<CustomTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex justify-center gap-2 text-xs flex-wrap"><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />Online</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />Offline {detailSite.offlineANPR||0}</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-violet-600" />Not Working {detailSite.notWorkingANPR||0}</span></div>
+                  </div>
+                </div>
+                {/* Issues for this site */}
+                <div className="bg-white rounded-xl border" style={{ borderColor:'#e2e8f0' }}>
+                  <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor:'#eef2f7' }}>
+                    <div className="font-bold text-sm flex items-center gap-2"><AlertTriangle size={14} /> Issues for this site • {detailProblems.length} problems</div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-slate-100 border" style={{ borderColor:'#e2e8f0' }}>{detailIncidents.length} incidents • {detailAccidents.length} accidents</span>
+                  </div>
+                  <div className="p-3">
+                    <div className="flex flex-wrap gap-1.5 mb-3">{detailProblems.length ? detailProblems.map(p=> <span key={p} className="px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800">{p}</span>) : <span className="text-xs text-slate-500">No problems — all systems online for this site.</span>}</div>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs font-bold tracking-widest uppercase text-slate-500 mb-1">Incidents ({detailIncidents.length})</div>
+                        {detailIncidents.length===0 ? <div className="text-xs text-slate-500 border rounded-xl p-3 bg-slate-50" style={{ borderColor:'#eef2f7' }}>No incidents for this site.</div> : <div className="space-y-2 max-h-[220px] overflow-auto pr-1">{detailIncidents.map(inc=>(
+                          <div key={inc.id} className="border rounded-xl p-2.5 bg-slate-50" style={{ borderColor:'#eef2f7' }}>
+                            <div className="text-xs font-bold">{inc.title}</div>
+                            <div className="text-xs text-slate-600 line-clamp-2">{inc.description}</div>
+                            <div className="mt-1 flex gap-1 text-[11px]"><span className={`px-1.5 py-0.5 rounded-full border font-bold ${inc.severity==='Critical'?'bg-red-600 text-white':inc.severity==='High'?'bg-orange-100 text-orange-700':'bg-slate-100'} `}>{inc.severity}</span><span className="px-1.5 py-0.5 rounded-full bg-white border" style={{ borderColor:'#e2e8f0' }}>{inc.status}</span><span className="ml-auto text-slate-500">{inc.date}</span></div>
+                          </div>
+                        ))}</div>}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold tracking-widest uppercase text-slate-500 mb-1">Accidents ({detailAccidents.length})</div>
+                        {detailAccidents.length===0 ? <div className="text-xs text-slate-500 border rounded-xl p-3 bg-slate-50" style={{ borderColor:'#eef2f7' }}>No accidents for this site.</div> : <div className="space-y-2 max-h-[220px] overflow-auto pr-1">{detailAccidents.map(acc=>(
+                          <div key={acc.id} className="border rounded-xl p-2.5 bg-red-50/50" style={{ borderColor:'#fecaca' }}>
+                            <div className="text-xs font-bold">{acc.title}</div>
+                            <div className="text-xs text-slate-600 line-clamp-2">{acc.description}</div>
+                            <div className="mt-1 flex gap-1 text-[11px]"><span className="px-1.5 py-0.5 rounded-full bg-red-600 text-white font-bold">{acc.severity}</span><span className="px-1.5 py-0.5 rounded-full bg-white border" style={{ borderColor:'#e2e8f0' }}>{acc.status}</span><span className="ml-auto text-slate-500">{acc.date}</span></div>
+                          </div>
+                        ))}</div>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
