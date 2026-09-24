@@ -62,6 +62,7 @@ function generate80Sites(){
     const notWorkingANPR = i % 15 === 0 ? 2 : i % 9 === 0 ? 1 : 0 // distinct from offline
     const notWorkingGate = i % 18 === 0 ? 2 : i % 11 === 0 ? 1 : 0
     const notWorkingIntercom = i % 20 === 0 ? 2 : i % 13 === 0 ? 1 : 0
+    const pincode = String(1000 + ((i * 7331) % 9000)).padStart(4,'0')
     const day = String(10 + (i % 18)).padStart(2,'0')
     items.push({
       id: genId(),
@@ -78,6 +79,7 @@ function generate80Sites(){
       notWorkingANPR: Math.min(notWorkingANPR, totalANPR),
       notWorkingGate: notWorkingGate,
       notWorkingIntercom: notWorkingIntercom,
+      pincode,
       image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600&h=400&fit=crop'
     })
   }
@@ -148,10 +150,10 @@ export default function App(){
       if(saved){
         const parsed = JSON.parse(saved)
         if(Array.isArray(parsed) && parsed.length===80){
-          // migrate missing fields for old 80
-          const needs = parsed.some(s=> s.notWorkingANPR === undefined || s.notWorkingGate === undefined || s.notWorkingIntercom === undefined)
+          // migrate missing fields for old 80 + pincode
+          const needs = parsed.some(s=> s.pincode === undefined || s.notWorkingANPR === undefined || s.notWorkingGate === undefined || s.notWorkingIntercom === undefined)
           if(needs){
-            const fixed = parsed.map((s,i)=> ({ ...s, notWorkingANPR: s.notWorkingANPR ?? (i % 15===0 ? 2 : i%9===0 ? 1 : 0), notWorkingGate: s.notWorkingGate ?? (i % 18===0 ? 2 : i%11===0 ? 1 : 0), notWorkingIntercom: s.notWorkingIntercom ?? (i % 20===0 ? 2 : i%13===0 ? 1 : 0) }))
+            const fixed = parsed.map((s,i)=> ({ ...s, pincode: s.pincode ?? String(1000 + ((i * 7331) % 9000)).padStart(4,'0'), notWorkingANPR: s.notWorkingANPR ?? (i % 15===0 ? 2 : i%9===0 ? 1 : 0), notWorkingGate: s.notWorkingGate ?? (i % 18===0 ? 2 : i%11===0 ? 1 : 0), notWorkingIntercom: s.notWorkingIntercom ?? (i % 20===0 ? 2 : i%13===0 ? 1 : 0) }))
             setTimeout(()=> localStorage.setItem('site-inspection-sites-v80', JSON.stringify(fixed)), 0)
             return fixed
           }
@@ -165,10 +167,12 @@ export default function App(){
     try{
       const saved = localStorage.getItem('site-inspection-incidents')
       if(saved) return JSON.parse(saved)
-      // link seed incidents to actual site ids
       const withIds = SEED_INCIDENTS.map((inc, i)=> ({ ...inc, siteId: SEED[i % SEED.length].id, siteName: SEED[i % SEED.length].name }))
       return withIds
     }catch{ return SEED_INCIDENTS }
+  })
+  const [accidents, setAccidents] = useState(()=>{
+    try{ const s=localStorage.getItem('dhre-accidents'); return s?JSON.parse(s):[] }catch{return []}
   })
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -187,9 +191,53 @@ export default function App(){
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ name:'', location:'', type:'Construction', status:'Pending', date: new Date().toISOString().slice(0,10), inspector:'', notes:'', totalCameras: 0, offlineCameras: 0, totalANPR: 0, offlineANPR: 0, notWorkingANPR: 0, notWorkingGate: 0, notWorkingIntercom: 0 })
   const [amcFilter, setAmcFilter] = useState('all') // all | offlineCam | offlineANPR
+  const [pinSiteId, setPinSiteId] = useState('')
 
   useEffect(()=>{ localStorage.setItem('site-inspection-sites-v80', JSON.stringify(sites)); localStorage.setItem('site-inspection-sites', JSON.stringify(sites)) }, [sites])
   useEffect(()=>{ localStorage.setItem('site-inspection-incidents', JSON.stringify(incidents)) }, [incidents])
+  useEffect(()=>{ localStorage.setItem('dhre-accidents', JSON.stringify(accidents)) }, [accidents])
+  // listen for updates from Owner Portal (2nd website) — auto-sync + answer requests
+  useEffect(()=>{
+    const onMsg = (e)=>{
+      if(e.data?.type==='dhre-sites-update' && Array.isArray(e.data.sites)) setSites(e.data.sites)
+      if(e.data?.type==='dhre-incidents-update' && Array.isArray(e.data.incidents)) setIncidents(e.data.incidents)
+      if(e.data?.type==='dhre-accidents-update' && Array.isArray(e.data.accidents)) setAccidents(e.data.accidents)
+      if(e.data?.type==='dhre-request-sites' && e.source){
+        try{ e.source.postMessage({ type: 'dhre-sites-update', sites }, '*') }catch{}
+      }
+      if(e.data?.type==='dhre-request-incidents' && e.source){
+        try{ e.source.postMessage({ type: 'dhre-incidents-update', incidents }, '*') }catch{}
+      }
+      if(e.data?.type==='dhre-request-accidents' && e.source){
+        try{ e.source.postMessage({ type: 'dhre-accidents-update', accidents }, '*') }catch{}
+      }
+    }
+    window.addEventListener('message', onMsg)
+    return ()=> window.removeEventListener('message', onMsg)
+  }, [sites, incidents, accidents])
+  // polling fallback for file:// (different folders don't share same localStorage origin)
+  useEffect(()=>{
+    const id = setInterval(()=>{
+      try{
+        const raw = localStorage.getItem('site-inspection-sites-v80')
+        if(raw){
+          const parsed = JSON.parse(raw)
+          if(JSON.stringify(parsed) !== JSON.stringify(sites)) setSites(parsed)
+        }
+        const rawInc = localStorage.getItem('site-inspection-incidents')
+        if(rawInc){
+          const pInc = JSON.parse(rawInc)
+          if(JSON.stringify(pInc) !== JSON.stringify(incidents)) setIncidents(pInc)
+        }
+        const rawAcc = localStorage.getItem('dhre-accidents')
+        if(rawAcc){
+          const pAcc = JSON.parse(rawAcc)
+          if(JSON.stringify(pAcc) !== JSON.stringify(accidents)) setAccidents(pAcc)
+        }
+      }catch{}
+    }, 1500)
+    return ()=> clearInterval(id)
+  }, [sites, incidents, accidents])
 
   const filtered = useMemo(()=>{
     return sites.filter(s=>{
@@ -316,6 +364,12 @@ export default function App(){
     setSites(prev=> prev.filter(s=>s.id!==id))
     toast.success('Site deleted')
   }
+  const regeneratePin = (siteId)=>{
+    const newPin = String(1000 + Math.floor(Math.random()*9000))
+    setSites(prev=> prev.map(s=> s.id===siteId ? { ...s, pincode: newPin } : s))
+    toast.success(`New pincode ${newPin}`)
+  }
+  const copyText = (t, msg)=>{ navigator.clipboard.writeText(t); toast.success(msg || `Copied ${t}`) }
 
   // Incident handlers
   const filteredIncidents = useMemo(()=>{
@@ -512,6 +566,7 @@ export default function App(){
                       <button onClick={()=>openEdit(site)} className="flex-1 py-2 rounded-full border bg-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-slate-50" style={{ borderColor: '#e2e8f0' }}><Pencil size={14} /> Edit</button>
                       <button onClick={()=>handleDelete(site.id)} className="px-3 py-2 rounded-full border bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200" style={{ borderColor: '#e2e8f0' }}><Trash2 size={16} /></button>
                       <button onClick={()=>{ openIncidentAdd(site.id); setPage('incidents'); toast.info(`Reporting incident for ${site.name}`)}} className="px-3 py-2 rounded-full bg-red-600 text-white hover:bg-red-700" title="Report incident"><FileText size={16} /></button>
+                      <a href={`http://localhost:5175?site=${site.id}`} target="_blank" className="px-3 py-2 rounded-full bg-sky-600 text-white hover:bg-sky-700 grid place-items-center" title="Open Owner Portal"><User size={16} /></a>
                     </div>
                       </div>
                     </motion.div>
@@ -541,6 +596,55 @@ export default function App(){
                 </div>
               </div>
             )}
+
+            {/* Pincode Access — small section for one site */}
+            <div className="mt-6 bg-white rounded-2xl border overflow-hidden" style={{ borderColor:'#e2e8f0' }}>
+              <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor:'#eef2f7' }}>
+                <div className="font-bold text-sm flex items-center gap-2"><ShieldCheck size={14} /> Pincode Access — Second Website Login</div>
+                <span className="text-xs px-2 py-1 rounded-full bg-slate-900 text-white font-bold">One site → one code</span>
+              </div>
+              <div className="p-4 grid lg:grid-cols-12 gap-4">
+                <div className="lg:col-span-5">
+                  <label className="text-xs font-bold tracking-widest uppercase text-slate-500">Select site to share</label>
+                  <select value={pinSiteId} onChange={e=>setPinSiteId(e.target.value)} className="mt-1.5 w-full px-3 py-2.5 rounded-xl border bg-slate-50 font-medium" style={{ borderColor:'#e2e8f0' }}>
+                    <option value="">— Choose one of 80 sites —</option>
+                    {sites.map(s=> <option key={s.id} value={s.id}>{s.name} — {s.pincode}</option>)}
+                  </select>
+                  <div className="mt-2 text-[11px] text-slate-500">Generate → copy → owner enters it in Owner Portal to login.</div>
+                </div>
+                <div className="lg:col-span-7">
+                  {pinSiteId ? (()=>{ const s=sites.find(x=>x.id===pinSiteId); if(!s) return null; const linkHttp=`http://localhost:5175?site=${s.id}&pin=${s.pincode}`; const linkFile=`file:///C:/Users/Bayhas/Desktop/owner-portal/index.html?site=${s.id}&pin=${s.pincode}`; return (
+                    <div className="rounded-xl border bg-slate-50 p-4" style={{ borderColor:'#eef2f7' }}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-bold tracking-widest uppercase text-slate-500">{s.name}</div>
+                          <div className="text-xs text-slate-500">{s.location} • {s.inspector}</div>
+                          <div className="mt-2 flex items-baseline gap-3">
+                            <span className="text-3xl font-extrabold tracking-widest">{s.pincode}</span>
+                            <span className="text-xs px-2 py-1 rounded-full bg-white border font-bold" style={{ borderColor:'#e2e8f0' }}>pincode</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <button onClick={()=>regeneratePin(s.id)} className="px-3 py-1.5 rounded-full bg-slate-900 text-white text-xs font-bold">Regenerate</button>
+                          <button onClick={()=>copyText(s.pincode, `Copied pincode ${s.pincode}`)} className="px-3 py-1.5 rounded-full bg-white border text-xs font-bold" style={{ borderColor:'#e2e8f0' }}>Copy code</button>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid gap-2">
+                        <div className="flex gap-1">
+                          <input readOnly value={linkHttp} className="flex-1 px-3 py-2 rounded-xl border bg-white text-xs font-mono" style={{ borderColor:'#e2e8f0' }} />
+                          <button onClick={()=>copyText(linkHttp, 'Copied owner link (dev)')} className="px-3 py-2 rounded-full bg-sky-600 text-white text-xs font-bold">Copy link</button>
+                        </div>
+                        <div className="flex gap-1">
+                          <input readOnly value={linkFile} className="flex-1 px-3 py-2 rounded-xl border bg-white text-xs font-mono" style={{ borderColor:'#e2e8f0' }} />
+                          <button onClick={()=>copyText(linkFile, 'Copied file link')} className="px-3 py-2 rounded-full bg-slate-900 text-white text-xs font-bold">Copy file link</button>
+                        </div>
+                        <div className="text-[11px] text-slate-500">Owner Portal login: select same site + enter <b>{s.pincode}</b> → sees only that site’s dashboard (offline cams, ANPR, incidents, accidents — all editable).</div>
+                      </div>
+                    </div>
+                  )})() : <div className="rounded-xl border bg-slate-50 p-8 text-center text-sm text-slate-500" style={{ borderColor:'#eef2f7' }}>Choose a site above to generate its pincode.</div>}
+                </div>
+              </div>
+            </div>
           </>
         )}
 
