@@ -194,6 +194,14 @@ export default function App(){
   const [amcFilter, setAmcFilter] = useState('all') // all | offlineCam | offlineANPR
   const [pinSiteId, setPinSiteId] = useState('')
   const [detailSiteId, setDetailSiteId] = useState(null)
+  const [auth, setAuth] = useState(()=>{
+    try{ const s=localStorage.getItem('dhre-combined-auth'); return s?JSON.parse(s):null }catch{return null}
+  })
+  const [loginMode, setLoginMode] = useState('owner')
+  const [adminUser, setAdminUser] = useState('')
+  const [adminPass, setAdminPass] = useState('')
+  const [ownerLoginSiteId, setOwnerLoginSiteId] = useState('')
+  const [ownerLoginPin, setOwnerLoginPin] = useState('')
 
   useEffect(()=>{ localStorage.setItem('site-inspection-sites-v80', JSON.stringify(sites)); localStorage.setItem('site-inspection-sites', JSON.stringify(sites)) }, [sites])
   useEffect(()=>{ localStorage.setItem('site-inspection-incidents', JSON.stringify(incidents)) }, [incidents])
@@ -343,6 +351,37 @@ export default function App(){
   const detailIncidents = useMemo(()=> incidents.filter(i=> i.siteId===detailSiteId), [incidents, detailSiteId])
   const detailAccidents = useMemo(()=> accidents.filter(a=> a.siteId===detailSiteId), [accidents, detailSiteId])
   const detailProblems = useMemo(()=> detailSite ? problemsForSite(detailSite, sites.indexOf(detailSite), incidents) : [], [detailSite, sites, incidents])
+  const handleOwnerLoginCombined = ()=>{
+    if(!ownerLoginSiteId){ toast.error('Select your site'); return }
+    if(!ownerLoginPin.trim()){ toast.error('Enter pincode'); return }
+    const site = sites.find(s=>s.id===ownerLoginSiteId)
+    const expected = site?.pincode || ''
+    const fallback = site ? String(1000 + ((sites.indexOf(site) * 7331) % 9000)).padStart(4,'0') : ''
+    const ok = ownerLoginPin === expected || ownerLoginPin === fallback || ownerLoginPin === '1234'
+    if(!ok){ toast.error(`Wrong pincode for ${site?.name || 'site'}`); return }
+    const a = { role:'owner', siteId: ownerLoginSiteId, name: site?.inspector || 'Owner', siteName: site?.name }
+    localStorage.setItem('dhre-combined-auth', JSON.stringify(a))
+    setAuth(a)
+    toast.success(`Welcome — ${site?.name}`)
+  }
+  const handleAdminLogin = ()=>{
+    if(adminUser==='admin' && adminPass==='admin'){
+      const a = { role:'admin', name: 'Admin' }
+      localStorage.setItem('dhre-combined-auth', JSON.stringify(a))
+      setAuth(a)
+      toast.success('Welcome Admin — full dashboard')
+    } else {
+      toast.error('Admin: user admin / pass admin (demo)')
+    }
+  }
+  const handleCombinedLogout = ()=>{
+    localStorage.removeItem('dhre-combined-auth')
+    setAuth(null)
+    setOwnerLoginSiteId('')
+    setOwnerLoginPin('')
+    setAdminUser('')
+    setAdminPass('')
+  }
 
   const openAdd = () => {
     setEditing(null)
@@ -441,6 +480,73 @@ export default function App(){
     toast.success(`Status → ${newStatus}`)
   }
 
+  if(!auth){
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex flex-col" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <Toaster richColors position="top-right" />
+        <header className="bg-gradient-to-r from-slate-900 via-slate-900 to-sky-900 border-b" style={{ borderColor:'#0f172a' }}>
+          <div className="max-w-[720px] mx-auto px-4 h-[64px] flex items-center gap-3">
+            <div className="h-10 px-2 rounded-xl bg-white grid place-items-center"><img src="./dhre-logo.svg" alt="DHRE" className="h-8 w-auto object-contain" onError={(e)=> e.currentTarget.src='./dhre-logo.jpg'} /></div>
+            <div className="font-extrabold text-white leading-none">DHRE Security Dashboard</div>
+            <span className="ml-auto text-xs px-2 py-1 rounded-full bg-white/15 text-white border border-white/20">Combined Login</span>
+          </div>
+        </header>
+        <div className="flex-1 grid place-items-center p-4">
+          <div className="w-full max-w-[720px] bg-white rounded-[24px] border shadow-xl overflow-hidden" style={{ borderColor:'#e2e8f0' }}>
+            <div className="flex p-1.5 gap-1 bg-slate-50 border-b" style={{ borderColor:'#eef2f7' }}>
+              <button onClick={()=>setLoginMode('owner')} className={`flex-1 py-2.5 rounded-full text-sm font-bold flex items-center justify-center gap-2 ${loginMode==='owner'?'bg-slate-900 text-white shadow':'bg-white text-slate-600 hover:bg-slate-100'}`}><User size={16} /> Owner Login</button>
+              <button onClick={()=>setLoginMode('admin')} className={`flex-1 py-2.5 rounded-full text-sm font-bold flex items-center justify-center gap-2 ${loginMode==='admin'?'bg-slate-900 text-white shadow':'bg-white text-slate-600 hover:bg-slate-100'}`}><ShieldCheck size={16} /> Admin Login</button>
+            </div>
+            <div className="p-6">
+              {loginMode==='owner' ? (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <div className="w-10 h-10 rounded-xl bg-sky-600 text-white grid place-items-center mx-auto"><User size={18} /></div>
+                    <h2 className="mt-2 font-extrabold">Owner — One site, one dashboard</h2>
+                    <p className="text-sm text-slate-500">80 different pages — you will see <b>only your site</b> (offline CCTV/ANPR, gate, intercom, incidents, accidents)</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold tracking-widest uppercase text-slate-500">Select your site *</label>
+                    <select value={ownerLoginSiteId} onChange={e=>setOwnerLoginSiteId(e.target.value)} className="mt-1.5 w-full px-4 py-3 rounded-xl border bg-slate-50 font-medium" style={{ borderColor:'#e2e8f0' }}>
+                      <option value="">— Choose one of 80 sites —</option>
+                      {sites.map(s=> <option key={s.id} value={s.id}>{s.name} — {s.location} • {s.pincode}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold tracking-widest uppercase text-slate-500">Pincode *</label>
+                    <input value={ownerLoginPin} onChange={e=>setOwnerLoginPin(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="4-digit code from Sites → Pincode Access" className="mt-1.5 w-full px-4 py-3 rounded-xl border bg-amber-50 font-mono text-lg tracking-widest text-center font-bold" style={{ borderColor: ownerLoginPin ? '#fde68a' : '#e2e8f0', background: ownerLoginPin ? '#fffbeb' : '#f8fafc' }} />
+                    <div className="text-[11px] text-slate-500 mt-1">Get code from main → <b>Sites → Pincode Access</b> for your site. Demo: <b>1234</b> works for any.</div>
+                  </div>
+                  <button onClick={handleOwnerLoginCombined} className="w-full py-3 rounded-full bg-sky-600 text-white font-bold hover:bg-sky-700">Login → My Site Website</button>
+                  <div className="text-xs text-center text-slate-500">You will be directed to <b>your site’s website</b> (one dashboard with everything for that site)</div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <div className="w-10 h-10 rounded-xl bg-slate-900 text-white grid place-items-center mx-auto"><ShieldCheck size={18} /></div>
+                    <h2 className="mt-2 font-extrabold">Admin — Full dashboard</h2>
+                    <p className="text-sm text-slate-500">See all 80 sites, AMC, charts, attention, reports</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold tracking-widest uppercase text-slate-500">Username *</label>
+                    <input value={adminUser} onChange={e=>setAdminUser(e.target.value)} placeholder="admin" className="mt-1.5 w-full px-4 py-3 rounded-xl border bg-slate-50" style={{ borderColor:'#e2e8f0' }} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold tracking-widest uppercase text-slate-500">Password *</label>
+                    <input type="password" value={adminPass} onChange={e=>setAdminPass(e.target.value)} placeholder="admin" className="mt-1.5 w-full px-4 py-3 rounded-xl border bg-slate-50" style={{ borderColor:'#e2e8f0' }} />
+                    <div className="text-[11px] text-slate-500 mt-1">Demo: <b>admin / admin</b></div>
+                  </div>
+                  <button onClick={handleAdminLogin} className="w-full py-3 rounded-full bg-slate-900 text-white font-bold hover:bg-black">Login → Admin Website</button>
+                </div>
+              )}
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-slate-400 text-center">One login page → directs to different websites (Owner: one site • Admin: all sites)</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900" style={{ fontFamily: 'Inter, sans-serif' }}>
       <Toaster richColors position="top-right" />
@@ -462,34 +568,80 @@ export default function App(){
               <div className="font-extrabold tracking-tight leading-none text-[24px] lg:text-[26px] text-white flex items-center gap-2">DHRE Security Dashboard <span className="hidden sm:inline-flex ml-1 px-2 py-0.5 rounded-full bg-white/15 text-white text-[11px] font-bold tracking-widest border border-white/20">LIVE</span></div>
               <div className="text-xs lg:text-sm text-sky-200 mt-0.5">Security Operations</div>
             </div>
-            <div className="w-11 lg:w-[140px] flex justify-end shrink-0">
-              {page==='incidents' ? (
-                <button onClick={()=>openIncidentAdd()} className="inline-flex items-center gap-2 px-4 lg:px-5 py-2.5 rounded-full bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition shadow-lg ring-1 ring-white/20">
-                  <FileText size={18} /> <span className="hidden lg:inline">Report Incident</span><span className="lg:hidden">Report</span>
+            <div className="flex items-center gap-2 shrink-0">
+              {auth && <span className="hidden lg:inline text-xs text-sky-200 max-w-[160px] truncate">{auth.role==='owner' ? sites.find(s=>s.id===auth.siteId)?.name : 'Admin'} • {auth.name} {auth.role==='owner' && `• ${sites.find(s=>s.id===auth.siteId)?.pincode}`}</span>}
+              <button onClick={handleCombinedLogout} className="px-3 py-1.5 rounded-full bg-white/15 text-white border border-white/20 text-xs font-bold hover:bg-white/20">Logout</button>
+              {auth?.role==='admin' && (page==='incidents' ? (
+                <button onClick={()=>openIncidentAdd()} className="hidden sm:inline-flex items-center gap-2 px-3 lg:px-5 py-2 rounded-full bg-red-600 text-white text-xs font-bold hover:bg-red-700 shadow">
+                  <FileText size={14} /> Report
                 </button>
               ) : page==='sites' ? (
-                <button onClick={openAdd} className="inline-flex items-center gap-2 px-3 lg:px-5 py-2.5 rounded-full bg-white text-slate-900 text-sm font-bold hover:bg-slate-100 transition shadow-lg">
-                  <Plus size={18} /> <span className="hidden lg:inline">Add Site</span><span className="lg:hidden">Add</span>
+                <button onClick={openAdd} className="hidden sm:inline-flex items-center gap-2 px-3 lg:px-5 py-2 rounded-full bg-white text-slate-900 text-xs font-bold hover:bg-slate-100 shadow">
+                  <Plus size={14} /> Add Site
                 </button>
-              ) : <span className="hidden lg:block w-[120px]" />}
+              ) : null)}
             </div>
           </div>
         </div>
-        {/* Bottom row — balanced nav under heading */}
-        <div className="border-t bg-slate-50" style={{ borderColor: '#eef2f7' }}>
-          <div className="max-w-[1280px] mx-auto px-4 lg:px-6 h-[48px] flex items-center justify-center">
-            <nav className="flex p-1 rounded-full bg-white border shadow-sm overflow-auto" style={{ borderColor:'#e2e8f0' }}>
-              <button onClick={()=>setPage('sites')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='sites'?'bg-slate-900 text-white shadow':'text-slate-600 hover:text-slate-900'}`}><LayoutGrid size={14} /> Sites</button>
-              <button onClick={()=>setPage('charts')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='charts'?'bg-[#f2c811] text-slate-900 shadow':'text-slate-600 hover:text-slate-900'}`}><BarChart3 size={14} /> Charts</button>
-              <button onClick={()=>setPage('amc')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='amc'?'bg-sky-600 text-white shadow':'text-slate-600 hover:text-slate-900'}`}><Video size={14} /> AMC</button>
-              <button onClick={()=>setPage('attention')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='attention'?'bg-red-600 text-white shadow':'text-slate-600 hover:text-slate-900'}`}><AlertTriangle size={12} /> Attention {attentionSites.length>0 && <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${page==='attention'?'bg-white text-red-600':'bg-red-100 text-red-700'}`}>{attentionSites.length}</span>}</button>
-              <button onClick={()=>setPage('incidents')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='incidents'?'bg-slate-900 text-white shadow':'text-slate-600 hover:text-slate-900'}`}><FileText size={14} /> Reports</button>
-            </nav>
+        {/* Bottom row — balanced nav under heading — different for admin vs owner */}
+        {auth?.role==='owner' ? (
+          <div className="border-t bg-sky-50" style={{ borderColor: '#e0f2fe' }}>
+            <div className="max-w-[1280px] mx-auto px-4 lg:px-6 h-[44px] flex items-center justify-center">
+              <div className="text-xs font-bold tracking-widest uppercase text-sky-700 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> My Site Website — {sites.find(s=>s.id===auth.siteId)?.name} • One dashboard • All things for this site
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="border-t bg-slate-50" style={{ borderColor: '#eef2f7' }}>
+            <div className="max-w-[1280px] mx-auto px-4 lg:px-6 h-[48px] flex items-center justify-center">
+              <nav className="flex p-1 rounded-full bg-white border shadow-sm overflow-auto" style={{ borderColor:'#e2e8f0' }}>
+                <button onClick={()=>setPage('sites')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='sites'?'bg-slate-900 text-white shadow':'text-slate-600 hover:text-slate-900'}`}><LayoutGrid size={14} /> Sites</button>
+                <button onClick={()=>setPage('charts')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='charts'?'bg-[#f2c811] text-slate-900 shadow':'text-slate-600 hover:text-slate-900'}`}><BarChart3 size={14} /> Charts</button>
+                <button onClick={()=>setPage('amc')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='amc'?'bg-sky-600 text-white shadow':'text-slate-600 hover:text-slate-900'}`}><Video size={14} /> AMC</button>
+                <button onClick={()=>setPage('attention')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='attention'?'bg-red-600 text-white shadow':'text-slate-600 hover:text-slate-900'}`}><AlertTriangle size={12} /> Attention {attentionSites.length>0 && <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${page==='attention'?'bg-white text-red-600':'bg-red-100 text-red-700'}`}>{attentionSites.length}</span>}</button>
+                <button onClick={()=>setPage('incidents')} className={`px-3 lg:px-5 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition shrink-0 ${page==='incidents'?'bg-slate-900 text-white shadow':'text-slate-600 hover:text-slate-900'}`}><FileText size={14} /> Reports</button>
+              </nav>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="max-w-[1280px] mx-auto px-4 lg:px-6 py-6 lg:py-8">
+        {auth?.role==='owner' ? (()=>{ const s=sites.find(x=>x.id===auth.siteId); if(!s) return <div className="text-center py-12">Site not found — <button onClick={handleCombinedLogout} className="underline font-bold">Logout</button></div>; const sInc=incidents.filter(i=>i.siteId===s.id); const sAcc=accidents.filter(a=>a.siteId===s.id); const sProbs=problemsForSite(s, sites.indexOf(s), incidents); const camOnline=Math.max(0,(s.totalCameras||0)-(s.offlineCameras||0)); const anprOnline=Math.max(0,(s.totalANPR||0)-(s.offlineANPR||0)-(s.notWorkingANPR||0)); return (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border p-4 flex items-center justify-between" style={{ borderColor:'#e2e8f0' }}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl grid place-items-center text-white ${TYPES.find(t=>t.value===s.type)?.color || 'bg-slate-700'}`}>{(() => { const T=TYPES.find(t=>t.value===s.type); return T ? <T.icon size={18} /> : <Building2 size={18} /> })()}</div>
+                <div><div className="font-extrabold leading-none">{s.name}</div><div className="text-xs text-slate-500 flex items-center gap-1.5"><MapPin size={11} />{s.location} • {s.type} • <StatusBadge status={s.status} /> • <span className="font-mono font-bold">{s.pincode}</span></div></div>
+              </div>
+              <span className="hidden sm:inline-flex text-xs px-2 py-1 rounded-full bg-sky-50 border border-sky-200 font-bold text-sky-700">My Site Website — All things in one dashboard</span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="bg-white rounded-xl border p-3" style={{ borderColor:'#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-slate-500">Total Cameras</div><div className="text-2xl font-extrabold">{s.totalCameras||0}</div><div className="text-xs text-slate-500">{camOnline} online • {s.offlineCameras||0} offline</div><button onClick={()=>{ const v=prompt('Total Cameras', String(s.totalCameras||0)); if(v!==null) setSites(prev=> prev.map(x=> x.id===s.id ? { ...x, totalCameras: Math.max(0, parseInt(v)||0) } : x)) }} className="mt-2 text-xs underline font-bold">Edit</button></div>
+              <div className="bg-white rounded-xl border p-3" style={{ borderColor: (s.offlineCameras||0)>0 ? '#fecaca' : '#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-red-600">Offline CCTV</div><div className="text-2xl font-extrabold text-red-600">{s.offlineCameras||0}</div><button onClick={()=> setSites(prev=> prev.map(x=> x.id===s.id ? { ...x, offlineCameras: 0 } : x))} className="mt-2 w-full py-1 rounded-full bg-emerald-600 text-white text-xs font-bold">Make online</button></div>
+              <div className="bg-white rounded-xl border p-3" style={{ borderColor:'#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-slate-500">Total ANPR</div><div className="text-2xl font-extrabold">{s.totalANPR||0}</div><button onClick={()=>{ const v=prompt('Total ANPR', String(s.totalANPR||0)); if(v!==null) setSites(prev=> prev.map(x=> x.id===s.id ? { ...x, totalANPR: Math.max(0, parseInt(v)||0) } : x)) }} className="mt-2 text-xs underline font-bold">Edit</button></div>
+              <div className="bg-white rounded-xl border p-3" style={{ borderColor: (s.offlineANPR||0)>0 ? '#fde68a' : '#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-amber-700">Offline ANPR</div><div className="text-2xl font-extrabold text-amber-600">{s.offlineANPR||0}</div><button onClick={()=> setSites(prev=> prev.map(x=> x.id===s.id ? { ...x, offlineANPR: 0 } : x))} className="mt-2 w-full py-1 rounded-full bg-emerald-600 text-white text-xs font-bold">Make online</button></div>
+            </div>
+            <div className="grid lg:grid-cols-3 gap-3">
+              <div className="bg-white rounded-xl border p-3" style={{ borderColor:'#e2e8f0' }}><div className="text-xs font-bold tracking-widest uppercase text-slate-500">Not Working</div><div className="mt-2 space-y-1 text-xs"><div className="flex justify-between"><span>ACS</span><b>{s.notWorkingANPR||0}</b><button onClick={()=> setSites(prev=> prev.map(x=> x.id===s.id ? { ...x, notWorkingANPR: 0 } : x))} className="text-violet-600 underline">Fix</button></div><div className="flex justify-between"><span>Gate barrier</span><b>{s.notWorkingGate||0}</b><button onClick={()=> setSites(prev=> prev.map(x=> x.id===s.id ? { ...x, notWorkingGate: 0 } : x))} className="text-sky-600 underline">Fix</button></div><div className="flex justify-between"><span>Intercom</span><b>{s.notWorkingIntercom||0}</b><button onClick={()=> setSites(prev=> prev.map(x=> x.id===s.id ? { ...x, notWorkingIntercom: 0 } : x))} className="text-slate-600 underline">Fix</button></div></div></div>
+              <div className="bg-white rounded-xl border p-3 lg:col-span-2" style={{ borderColor:'#e2e8f0' }}><div className="text-xs font-bold tracking-widest uppercase text-slate-500">Problems for this site</div><div className="mt-2 flex flex-wrap gap-1.5">{sProbs.length ? sProbs.map(p=> <span key={p} className="px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800">{p}</span>) : <span className="text-xs text-slate-500">No problems — all online</span>}</div><div className="mt-2 h-[100px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={[{ name:'Cam Off', v: s.offlineCameras||0 }, { name:'ANPR Off', v: s.offlineANPR||0 }, { name:'ACS', v: s.notWorkingANPR||0 }, { name:'Gate', v: s.notWorkingGate||0 }, { name:'Intercom', v: s.notWorkingIntercom||0 }]}><CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} /><XAxis dataKey="name" tick={{ fontSize:10, fill:'#64748b' }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize:10, fill:'#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} /><Tooltip content={<CustomTooltip />} /><Bar dataKey="v" fill="#ef4444" radius={[4,4,0,0]} barSize={12} /></BarChart></ResponsiveContainer></div></div>
+            </div>
+            <div className="grid lg:grid-cols-2 gap-3">
+              <div className="bg-white rounded-xl border overflow-hidden" style={{ borderColor:'#e2e8f0' }}><div className="px-3 py-2 border-b bg-slate-50 font-bold text-sm flex items-center justify-between" style={{ borderColor:'#eef2f7' }}><span className="flex items-center gap-1.5"><FileText size={14} /> Incidents — {sInc.length}</span><button onClick={()=>{ setPage('incidents'); }} className="text-xs underline">View all →</button></div><div className="p-3 space-y-2 max-h-[320px] overflow-auto">{sInc.length===0 ? <div className="text-xs text-slate-500 text-center py-6">No incidents for this site.</div> : sInc.map(inc=>(
+                <div key={inc.id} className="border rounded-xl p-2.5 bg-slate-50" style={{ borderColor:'#eef2f7' }}>
+                  <div className="text-xs font-bold">{inc.title}</div><div className="text-xs text-slate-600 line-clamp-2">{inc.description}</div><div className="mt-1 flex gap-1"><span className={`px-1.5 py-0.5 rounded-full border text-[11px] font-bold ${inc.severity==='Critical'?'bg-red-600 text-white':inc.severity==='High'?'bg-orange-100 text-orange-700':'bg-slate-100'}`}>{inc.severity}</span><span className="ml-auto text-[11px] text-slate-500">{inc.status} • {inc.date}</span></div>
+                </div>
+              ))}</div></div>
+              <div className="bg-white rounded-xl border overflow-hidden" style={{ borderColor:'#e2e8f0' }}><div className="px-3 py-2 border-b bg-red-50 font-bold text-sm flex items-center justify-between" style={{ borderColor:'#fecaca' }}><span className="flex items-center gap-1.5"><AlertTriangle size={14} /> Accidents — {sAcc.length}</span><span className="text-xs px-2 py-1 rounded-full bg-white border" style={{ borderColor:'#fecaca' }}>{sAcc.filter(a=>a.status==='Open').length} open</span></div><div className="p-3 space-y-2 max-h-[320px] overflow-auto">{sAcc.length===0 ? <div className="text-xs text-slate-500 text-center py-6">No accidents for this site.</div> : sAcc.map(acc=>(
+                <div key={acc.id} className="border rounded-xl p-2.5 bg-red-50/50" style={{ borderColor:'#fecaca' }}>
+                  <div className="text-xs font-bold">{acc.title}</div><div className="text-xs text-slate-600 line-clamp-2">{acc.description}</div><div className="mt-1 flex gap-1"><span className="px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[11px] font-bold">{acc.severity}</span><span className="ml-auto text-[11px] text-slate-500">{acc.status} • {acc.date}</span></div>
+                </div>
+              ))}</div></div>
+            </div>
+          </div>
+        )})() : (
+        <>
         {/* PAGE: SITES */}
         {page==='sites' && (
           <>
@@ -1163,6 +1315,7 @@ export default function App(){
             else setPage('sites')
           }} className="underline font-semibold hover:text-slate-700">Go to {page==='sites'?'Charts':page==='charts'?'AMC':page==='amc'?'Attention':page==='attention'?'Incidents':'Sites'} →</button>
         </p>
+        </> )}
       </main>
 
       {/* Add/Edit Modal */}
