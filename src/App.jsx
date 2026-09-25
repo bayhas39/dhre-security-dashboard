@@ -275,6 +275,29 @@ export default function App(){
     }, 800)
     return ()=> clearInterval(id)
   }, [sites, incidents, accidents])
+  // fully automatic — live simulation: random site offline fluctuates every 5s
+  const [liveOn, setLiveOn] = useState(true)
+  const [lastSync, setLastSync] = useState(()=> new Date().toLocaleTimeString())
+  useEffect(()=>{
+    if(!liveOn) return
+    const id = setInterval(()=>{
+      setSites(prev=> prev.map((s,i)=>{
+        if(Math.random() < 0.04){
+          const d = Math.random() > 0.5 ? 1 : -1
+          const v = Math.max(0, Math.min(s.totalCameras||0, (s.offlineCameras||0)+d))
+          if(v!==s.offlineCameras) return { ...s, offlineCameras: v }
+        }
+        if(Math.random() < 0.02){
+          const d2 = Math.random() > 0.5 ? 1 : -1
+          const v2 = Math.max(0, Math.min(s.totalANPR||0, (s.offlineANPR||0)+d2))
+          if(v2!==s.offlineANPR) return { ...s, offlineANPR: v2 }
+        }
+        return s
+      }))
+      setLastSync(new Date().toLocaleTimeString())
+    }, 5000)
+    return ()=> clearInterval(id)
+  }, [liveOn])
   // polling fallback for file:// (different folders don't share same localStorage origin)
   useEffect(()=>{
     const id = setInterval(()=>{
@@ -618,8 +641,8 @@ export default function App(){
               />
             </div>
             <div className="flex-1 flex flex-col items-center justify-center text-center">
-              <div className="font-extrabold tracking-tight leading-none text-[24px] lg:text-[26px] text-white flex items-center gap-2">DHRE Security Dashboard <span className="hidden sm:inline-flex ml-1 px-2 py-0.5 rounded-full bg-white/15 text-white text-[11px] font-bold tracking-widest border border-white/20">LIVE</span></div>
-              <div className="text-xs lg:text-sm text-sky-200 mt-0.5">Security Operations</div>
+              <div className="font-extrabold tracking-tight leading-none text-[24px] lg:text-[26px] text-white flex items-center gap-2">DHRE Security Dashboard <button onClick={()=>setLiveOn(v=>!v)} className={`hidden sm:inline-flex ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold tracking-widest border ${liveOn?'bg-emerald-500 text-white border-emerald-400 animate-pulse':'bg-white/15 text-white border-white/20'}`}>{liveOn?'LIVE • '+lastSync:'PAUSED'}</button></div>
+              <div className="text-xs lg:text-sm text-sky-200 mt-0.5 flex items-center gap-2">Security Operations <span className="hidden sm:inline-flex items-center gap-1 text-[11px]"><span className={`w-1.5 h-1.5 rounded-full ${liveOn?'bg-emerald-400 animate-pulse':'bg-slate-400'}`} />{liveOn?'Auto-sync every 5s • fully automatic':'Paused'}</span></div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {auth && <span className="hidden lg:inline text-xs text-sky-200 max-w-[160px] truncate">{auth.role==='owner' ? sites.find(s=>s.id===auth.siteId)?.name : 'Admin'} • {auth.name} {auth.role==='owner' && `• ${sites.find(s=>s.id===auth.siteId)?.pincode}`}</span>}
