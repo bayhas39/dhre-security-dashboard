@@ -365,13 +365,15 @@ export default function App(){
     toast.success(`Welcome — ${site?.name}`)
   }
   const handleAdminLogin = ()=>{
-    if(adminUser==='admin' && adminPass==='admin'){
-      const a = { role:'admin', name: 'Admin' }
+    const u = adminUser.trim().toLowerCase()
+    const p = adminPass.trim()
+    if((u==='admin' && p==='admin') || (u==='bayhas' && p==='bayhas123')){
+      const a = { role:'admin', name: u==='bayhas' ? 'Bayhas' : 'Admin' }
       localStorage.setItem('dhre-combined-auth', JSON.stringify(a))
       setAuth(a)
-      toast.success('Welcome Admin — full dashboard')
+      toast.success(`Welcome ${a.name} — full dashboard`)
     } else {
-      toast.error('Admin: user admin / pass admin (demo)')
+      toast.error('Use bayhas / bayhas123 (or admin / admin)')
     }
   }
   const handleCombinedLogout = ()=>{
@@ -529,12 +531,12 @@ export default function App(){
                   </div>
                   <div>
                     <label className="text-xs font-bold tracking-widest uppercase text-slate-500">Username *</label>
-                    <input value={adminUser} onChange={e=>setAdminUser(e.target.value)} placeholder="admin" className="mt-1.5 w-full px-4 py-3 rounded-xl border bg-slate-50" style={{ borderColor:'#e2e8f0' }} />
+                    <input value={adminUser} onChange={e=>setAdminUser(e.target.value)} placeholder="bayhas" className="mt-1.5 w-full px-4 py-3 rounded-xl border bg-slate-50" style={{ borderColor:'#e2e8f0' }} />
                   </div>
                   <div>
                     <label className="text-xs font-bold tracking-widest uppercase text-slate-500">Password *</label>
-                    <input type="password" value={adminPass} onChange={e=>setAdminPass(e.target.value)} placeholder="admin" className="mt-1.5 w-full px-4 py-3 rounded-xl border bg-slate-50" style={{ borderColor:'#e2e8f0' }} />
-                    <div className="text-[11px] text-slate-500 mt-1">Demo: <b>admin / admin</b></div>
+                    <input type="password" value={adminPass} onChange={e=>setAdminPass(e.target.value)} placeholder="bayhas123" className="mt-1.5 w-full px-4 py-3 rounded-xl border bg-slate-50" style={{ borderColor:'#e2e8f0' }} />
+                    <div className="text-[11px] text-slate-500 mt-1">Use <b>bayhas / bayhas123</b> (admin / admin also works)</div>
                   </div>
                   <button onClick={handleAdminLogin} className="w-full py-3 rounded-full bg-slate-900 text-white font-bold hover:bg-black">Login → Admin Website</button>
                 </div>
