@@ -1022,6 +1022,22 @@ export default function App(){
                 </AreaChart>
               </ResponsiveContainer>
             </PowerBICard>
+            <PowerBICard title="Security — Device Health" subtitle="Offline CCTV • Offline ANPR • Not Working ACS/Gate/Intercom — per site Top 10" icon={ShieldCheck} className="lg:col-span-12">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={[...amcStats.perSite].sort((a,b)=> (b.offlineCameras+b.offlineANPR+b.notWorkingANPR+b.notWorkingGate+b.notWorkingIntercom) - (a.offlineCameras+a.offlineANPR+a.notWorkingANPR+a.notWorkingGate+a.notWorkingIntercom)).slice(0,10)} margin={{ top: 8, right: 12, left: 0, bottom: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill:'#64748b', fontWeight:600 }} interval={0} angle={-20} textAnchor="end" height={50} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill:'#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="offlineCameras" name="Offline CCTV" stackId="a" fill="#ef4444" />
+                  <Bar dataKey="offlineANPR" name="Offline ANPR" stackId="a" fill="#f59e0b" />
+                  <Bar dataKey="notWorkingANPR" name="Not Working ACS" stackId="a" fill="#7c3aed" />
+                  <Bar dataKey="notWorkingGate" name="Gate barrier" stackId="a" fill="#0ea5e9" />
+                  <Bar dataKey="notWorkingIntercom" name="Intercom" stackId="a" fill="#1e293b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </PowerBICard>
           </div>
 
           <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-slate-400">
