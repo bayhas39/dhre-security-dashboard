@@ -206,14 +206,21 @@ export default function App(){
   useEffect(()=>{ localStorage.setItem('site-inspection-sites-v80', JSON.stringify(sites)); localStorage.setItem('site-inspection-sites', JSON.stringify(sites)) }, [sites])
   useEffect(()=>{ localStorage.setItem('site-inspection-incidents', JSON.stringify(incidents)) }, [incidents])
   useEffect(()=>{ localStorage.setItem('dhre-accidents', JSON.stringify(accidents)) }, [accidents])
-  // listen for updates from Owner Portal (2nd website) — auto-sync + answer requests
+  // fully automatic sync — BroadcastChannel (same origin: github.io) + postMessage (cross-port/file) + polling
   useEffect(()=>{
+    let bc
+    try{ bc = new BroadcastChannel('dhre-sync'); bc.onmessage = (e)=>{
+      if(e.data?.type==='sites-update' && Array.isArray(e.data.sites)) setSites(e.data.sites)
+      if(e.data?.type==='incidents-update' && Array.isArray(e.data.incidents)) setIncidents(e.data.incidents)
+      if(e.data?.type==='accidents-update' && Array.isArray(e.data.accidents)) setAccidents(e.data.accidents)
+    }}catch{}
     const onMsg = (e)=>{
       if(e.data?.type==='dhre-sites-update' && Array.isArray(e.data.sites)) setSites(e.data.sites)
       if(e.data?.type==='dhre-incidents-update' && Array.isArray(e.data.incidents)) setIncidents(e.data.incidents)
       if(e.data?.type==='dhre-accidents-update' && Array.isArray(e.data.accidents)) setAccidents(e.data.accidents)
       if(e.data?.type==='dhre-request-sites' && e.source){
         try{ e.source.postMessage({ type: 'dhre-sites-update', sites }, '*') }catch{}
+        try{ bc?.postMessage({ type: 'sites-update', sites }) }catch{}
       }
       if(e.data?.type==='dhre-request-incidents' && e.source){
         try{ e.source.postMessage({ type: 'dhre-incidents-update', incidents }, '*') }catch{}
@@ -223,7 +230,50 @@ export default function App(){
       }
     }
     window.addEventListener('message', onMsg)
-    return ()=> window.removeEventListener('message', onMsg)
+    return ()=>{ window.removeEventListener('message', onMsg); try{ bc?.close() }catch{} }
+  }, [sites, incidents, accidents])
+  // broadcast every change instantly (fully automatic)
+  useEffect(()=>{
+    try{ new BroadcastChannel('dhre-sync').postMessage({ type: 'sites-update', sites }) }catch{}
+    // also notify opener if opened as website link
+    if(window.opener && !window.opener.closed){
+      try{ window.opener.postMessage({ type: 'dhre-sites-update', sites }, '*') }catch{}
+    }
+  }, [sites])
+  useEffect(()=>{
+    try{ new BroadcastChannel('dhre-sync').postMessage({ type: 'incidents-update', incidents }) }catch{}
+    if(window.opener && !window.opener.closed){
+      try{ window.opener.postMessage({ type: 'dhre-incidents-update', incidents }, '*') }catch{}
+    }
+  }, [incidents])
+  useEffect(()=>{
+    try{ new BroadcastChannel('dhre-sync').postMessage({ type: 'accidents-update', accidents }) }catch{}
+    if(window.opener && !window.opener.closed){
+      try{ window.opener.postMessage({ type: 'dhre-accidents-update', accidents }, '*') }catch{}
+    }
+  }, [accidents])
+  // polling fallback for file:// (different folders) — fully automatic without refresh
+  useEffect(()=>{
+    const id = setInterval(()=>{
+      try{
+        const raw = localStorage.getItem('site-inspection-sites-v80')
+        if(raw){
+          const parsed = JSON.parse(raw)
+          if(JSON.stringify(parsed) !== JSON.stringify(sites)) setSites(parsed)
+        }
+        const rawInc = localStorage.getItem('site-inspection-incidents')
+        if(rawInc){
+          const pInc = JSON.parse(rawInc)
+          if(JSON.stringify(pInc) !== JSON.stringify(incidents)) setIncidents(pInc)
+        }
+        const rawAcc = localStorage.getItem('dhre-accidents')
+        if(rawAcc){
+          const pAcc = JSON.parse(rawAcc)
+          if(JSON.stringify(pAcc) !== JSON.stringify(accidents)) setAccidents(pAcc)
+        }
+      }catch{}
+    }, 800)
+    return ()=> clearInterval(id)
   }, [sites, incidents, accidents])
   // polling fallback for file:// (different folders don't share same localStorage origin)
   useEffect(()=>{
@@ -400,9 +450,10 @@ export default function App(){
     if(!form.name.trim() || !form.location.trim()){ toast.error('Site name and location are required'); return }
     if(editing){
       setSites(prev=> prev.map(s=> s.id===editing ? { ...s, ...form } : s))
-      toast.success('Site updated')
+      toast.success('Site updated — auto-synced to Owner Website')
     } else {
-      const newSite = { id: genId(), ...form, image: `https://images.unsplash.com/photo-${['1486406146926-c627a92ad1ab','1600596542815-ffad4c1539a9','1581091226825-a6a2a5aee158','1497366216548-37526070297c'][Math.floor(Math.random()*4)]}?w=600&h=400&fit=crop` }
+      const newPin = String(1000 + Math.floor(Math.random()*9000))
+      const newSite = { id: genDeterministicId(sites.length+1), ...form, pincode: newPin, image: `https://images.unsplash.com/photo-${['1486406146926-c627a92ad1ab','1600596542815-ffad4c1539a9','1581091226825-a6a2a5aee158','1497366216548-37526070297c'][Math.floor(Math.random()*4)]}?w=600&h=400&fit=crop` }
       setSites(prev=>[newSite, ...prev])
       toast.success('Site added')
     }
