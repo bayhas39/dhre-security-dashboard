@@ -1483,7 +1483,6 @@ export default function App(){
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={()=>{ setDetailSiteId(null); openEdit(detailSite)}} className="px-3 py-1.5 rounded-full bg-white border text-xs font-bold hover:bg-slate-50" style={{ borderColor:'#e2e8f0' }}><Pencil size={12} /> Edit</button>
-                  <a href={`https://bayhas39.github.io/dhre-security-owner/?site=${detailSite.id}&pin=${detailSite.pincode}&siteName=${encodeURIComponent(detailSite.name)}`} target="_blank" className="px-3 py-1.5 rounded-full bg-sky-600 text-white text-xs font-bold hover:bg-sky-700">Owner Website →</a>
                   <button onClick={()=>setDetailSiteId(null)} className="w-8 h-8 grid place-items-center rounded-full hover:bg-slate-100"><X size={18} /></button>
                 </div>
               </div>
