@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, MapPin, Calendar, User, Building2, ClipboardCheck,
   MoreVertical, Trash2, Pencil, Eye, Filter, X, Save, Hammer, ShieldCheck, Home,
-  Factory, HardHat, Clock3, CheckCircle2, AlertTriangle, FileText, LayoutGrid, List, BarChart3, TrendingUp, Users, Video, Camera, ScanSearch, WifiOff
+  Factory, HardHat, Clock3, CheckCircle2, AlertTriangle, FileText, LayoutGrid, List, BarChart3, TrendingUp, Users, Video, Camera, ScanSearch, WifiOff, Copy, KeyRound
 } from 'lucide-react'
 import { Toaster, toast } from 'sonner'
 import {
@@ -1533,17 +1533,23 @@ export default function App(){
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200">
+                    <KeyRound size={12} className="text-amber-600" />
+                    <span className="font-mono font-bold text-xs tracking-widest">{detailSite.pincode}</span>
+                    <button onClick={()=>{ navigator.clipboard.writeText(detailSite.pincode); toast.success(`Copied pincode ${detailSite.pincode}`) }} className="p-1 hover:bg-amber-100 rounded-full"><Copy size={12} /></button>
+                  </div>
                   <button onClick={()=>{ setDetailSiteId(null); openEdit(detailSite)}} className="px-3 py-1.5 rounded-full bg-white border text-xs font-bold hover:bg-slate-50" style={{ borderColor:'#e2e8f0' }}><Pencil size={12} /> Edit</button>
                   <button onClick={()=>setDetailSiteId(null)} className="w-8 h-8 grid place-items-center rounded-full hover:bg-slate-100"><X size={18} /></button>
                 </div>
               </div>
               <div className="p-4 overflow-auto space-y-4">
                 {/* Stats for this site */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                   <div className="bg-white rounded-xl border p-3" style={{ borderColor:'#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-slate-500">Total Cameras</div><div className="text-2xl font-extrabold">{detailSite.totalCameras||0}</div><div className="text-xs text-slate-500">{(detailSite.totalCameras||0)-(detailSite.offlineCameras||0)} online • {detailSite.offlineCameras||0} offline</div></div>
                   <div className="bg-white rounded-xl border p-3" style={{ borderColor: (detailSite.offlineCameras||0)>0 ? '#fecaca' : '#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-red-600">Offline CCTV</div><div className="text-2xl font-extrabold text-red-600">{detailSite.offlineCameras||0}</div><div className="text-xs text-slate-500">{detailSite.totalCameras ? Math.round(((detailSite.offlineCameras||0)/detailSite.totalCameras)*100) : 0}% offline</div></div>
                   <div className="bg-white rounded-xl border p-3" style={{ borderColor:'#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-slate-500">ANPR</div><div className="text-2xl font-extrabold">{detailSite.totalANPR||0}</div><div className="text-xs text-slate-500">Offline {detailSite.offlineANPR||0} • Not working {detailSite.notWorkingANPR||0}</div></div>
                   <div className="bg-white rounded-xl border p-3" style={{ borderColor: detailProblems.length>0 ? '#fde68a' : '#e2e8f0' }}><div className="text-[11px] font-bold tracking-widest uppercase text-amber-700">Problems</div><div className="text-2xl font-extrabold">{detailProblems.length}</div><div className="text-xs text-slate-500 truncate">{detailProblems.join(' • ') || 'No problems'}</div></div>
+                  <div className="bg-amber-50 rounded-xl border p-3" style={{ borderColor:'#fde68a' }}><div className="text-[11px] font-bold tracking-widest uppercase text-amber-700 flex items-center gap-1"><KeyRound size={11} /> Pincode</div><div className="mt-1 flex items-center gap-1"><span className="text-xl font-mono font-extrabold tracking-widest">{detailSite.pincode}</span><button onClick={()=>{ navigator.clipboard.writeText(detailSite.pincode); toast.success(`Copied ${detailSite.pincode}`)}} className="p-1 hover:bg-amber-100 rounded"><Copy size={12} /></button><button onClick={()=>{ navigator.clipboard.writeText(`https://bayhas39.github.io/dhre-security-owner/?site=${detailSite.id}&pin=${detailSite.pincode}&siteName=${encodeURIComponent(detailSite.name)}`); toast.success('Copied owner link') }} className="ml-auto text-[11px] underline font-bold text-amber-700">Copy link</button></div><button onClick={()=>{ const np=String(1000+Math.floor(Math.random()*9000)); setSites(prev=> prev.map(s=> s.id===detailSite.id ? {...s, pincode:np}:s)); toast.success(`New pincode ${np}`)}} className="mt-1 text-[11px] underline font-bold text-amber-700">Regenerate</button></div>
                 </div>
                 {/* Charts for this site */}
                 <div className="grid lg:grid-cols-2 gap-3">
